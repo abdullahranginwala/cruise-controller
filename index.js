@@ -18,6 +18,44 @@ class RateLimiter {
       .then(currentCount => currentCount >= this.max);
   }
 
+  slidingWindowCounter(req) {
+    const now = Date.now();
+    const identifier = this.getKey(req);
+
+    return this.store.get(identifier)
+      .then(timestamps => {
+        const windowStart = now - this.windowMs;
+        timestamps = timestamps.filter(timestamp => timestamp > windowStart);
+        
+        if (timestamps.length >= this.max) {
+          return true; // limit exceeded
+        } else {
+          timestamps.push(now);
+          this.store.increment(identifier, this.windowMs);
+          return false; // continue processing the request
+        }
+      });
+  }
+
+  slidingWindowLog(req) {
+    const now = Date.now();
+    const identifier = this.getKey(req);
+    
+    return this.store.get(identifier)
+      .then(logs => {
+        const windowStart = now - this.windowMs;
+        logs = logs.filter(log => log > windowStart);
+        
+        if (logs.length >= this.max) {
+          return true; // limit exceeded
+        } else {
+          logs.push(now);
+          this.store.increment(identifier, this.windowMs);
+          return false; // continue processing the request
+        }
+      });
+  }
+
   // Token Bucket strategy
   tokenBucket(req) {
     const identifier = this.getKey(req);
@@ -33,20 +71,20 @@ class RateLimiter {
   }
 
   middleware() {
-    return (req, res, next) => {
+    return async (req, res, next) => { // added async here
       const identifier = this.getKey(req);
-
+  
       // Handle whitelisting
       if (this.whitelist.includes(identifier)) {
         return next();
       }
-
+  
       // Handle blacklisting
       if (this.blacklist.includes(identifier)) {
         return this.onExceeded(req, res);
       }
-
-      if (this.strategy(req)) {
+  
+      if (await this.strategy(req)) { // added await here
         return this.onExceeded(req, res);
       } else {
         this.store.increment(identifier);
@@ -54,6 +92,7 @@ class RateLimiter {
       }
     };
   }
+  
 }
 
 module.exports = RateLimiter;
