@@ -1,6 +1,6 @@
 {
   "name": "cruise-controller",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "An Express.js middleware for handling rate limiting with multiple strategies and flexible configurations.",
   "main": "src/index.js",
   "scripts": {
