@@ -1,44 +1,103 @@
-const redis = require('redis');
+const Redis = require('ioredis');
 
+/**
+ * A `Store` to keep track of API hit counts for each 'key' in Redis.
+ *
+ * @public
+ */
 class RedisStore {
-  constructor() {
-    this.client = redis.createClient();
+    /**
+     * @param {object} options - Configuration options for the Redis store.
+     * @param {number} options.windowMs - Window size after which all the hit counts are reset.
+     */
+    constructor(options) {
+        // Initialize a Redis client
+        this.client = new Redis();
 
-    // Graceful error handling
-    this.client.on('error', (err) => {
-      console.error('Redis error:', err);
-    });
-  }
+        /**
+         * Window size after which all the hit counts are reset.
+         * @private
+         */
+        this.windowMs = options.windowMs;
 
-  increment(key, windowMs) {
-    const now = Date.now();
+        // Initialize the reset time
+        this.resetTime = this.calculateResetTime();
 
-    return new Promise((resolve, reject) => {
-      // use lpush to add timestamp to the list at key
-      this.client.lpush(key, now, (err) => {
-        if (err) return reject(err);
+        // Initialize a timer to keep track of the window
+        this.timer = setInterval(async () => {
+            await this.resetAll();
+        }, this.windowMs);
 
-        // set expiry for the key
-        this.client.expire(key, Math.ceil(windowMs / 1000), (err) => {
-          if (err) return reject(err);
-          resolve();
-        });
-      });
-    });
-  }
+        // Clean up the timer
+        if (this.timer.unref) this.timer.unref();
+    }
 
-  get(key) {
-    return new Promise((resolve, reject) => {
-      // use lrange to get the list at key
-      this.client.lrange(key, 0, -1, (err, res) => {
-        if (err) return reject(err);
+    /**
+     * Increment the hit count for the specified key.
+     * @param {string} key - The key to increment the hit count for.
+     * @param {number} [value=1] - The value to increment by (default is 1).
+     * @returns {Promise<object>} - An object containing the new count and reset time.
+     */
+    async increment(key, value = 1) {
+        const currentCount = await this.client.incrby(key, value);
+        // Set the expiration for the key
+        await this.client.pexpire(key, this.windowMs);
 
-        // convert string timestamps to numbers and reverse to maintain chronological order
-        const timestamps = res.map(Number).reverse() || [];
-        resolve(timestamps);
-      });
-    });
-  }
+        return {
+            newCount: currentCount,
+            resetTime: this.resetTime,
+        };
+    }
+
+    /**
+     * Decrement the hit count for the specified key.
+     * @param {string} key - The key to decrement the hit count for.
+     */
+    async decrement(key) {
+        await this.client.decr(key);
+    }
+
+    /**
+     * Reset the hit count for the specified key.
+     * @param {string} key - The key to reset the hit count for.
+     */
+    async resetKey(key) {
+        await this.client.del(key);
+    }
+
+    /**
+     * Reset the hit counts for all keys.
+     */
+    async resetAll() {
+        // Delete all keys
+        const keys = await this.client.keys('*');
+        if (keys.length > 0) {
+            await this.client.del(keys);
+        }
+
+        // Update the reset time
+        this.resetTime = this.calculateResetTime();
+    }
+
+    /**
+     * Close the Redis store and stop the reset timer.
+     */
+    close() {
+        clearInterval(this.timer);
+        this.client.quit();
+    }
+
+    /**
+     * Calculate the time when hit counts will be reset.
+     * @returns {Date} - The calculated reset time.
+     * @private
+     */
+    calculateResetTime() {
+        const resetTime = new Date();
+        const newTime = resetTime.getTime() + this.windowMs;
+        resetTime.setTime(newTime);
+        return resetTime;
+    }
 }
 
 module.exports = RedisStore;
