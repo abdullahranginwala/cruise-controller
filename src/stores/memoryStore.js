@@ -55,6 +55,10 @@ class MemoryStore {
       };
   }
 
+  async get(key) {
+    return this.storage.get(key) || 0;
+  }
+
   /**
    * Decrement the hit count for the specified key.
    * @param {string} key - The key to decrement the hit count for.

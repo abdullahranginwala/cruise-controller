@@ -1,4 +1,4 @@
-const { default: MemoryStore } = require("./stores/memoryStore");
+const MemoryStore = require('./stores/memoryStore');
 
 class RateLimiter {
     constructor(options = {}) {
@@ -37,7 +37,7 @@ class RateLimiter {
         if (currentCount > this.max) {
             // Introduce a delay before proceeding if enabled
             if (this.enableThrottling) {
-                await new Promise(resolve => setTimeout(resolve, 1000)); // Example delay: 1 second
+                await new Promise(resolve => setTimeout(resolve, 1000));
             }
             return true;
         }
@@ -68,7 +68,7 @@ class RateLimiter {
             }
 
             // Throttle requests first (if enabled)
-            if (this.enableThrottling && await this.throttling(req)) {
+            if (this.enableThrottling && await this.delayedRateLimiting(req)) {
                 return this.onExceeded(req, res);
             }
 
@@ -85,7 +85,7 @@ class RateLimiter {
     }
 
     setRateLimitHeaders(res, identifier) {
-        const currentCount = this.store.getSync(identifier);
+        const currentCount = this.store.get(identifier);
         const remaining = Math.max(0, this.max - currentCount);
 
         res.setHeader('X-RateLimit-Limit', this.max);
