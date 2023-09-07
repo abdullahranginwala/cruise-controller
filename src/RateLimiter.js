@@ -9,35 +9,31 @@ class RateLimiter {
         this.whitelist = options.whitelist || [];
         this.blacklist = options.blacklist || [];
         this.onExceeded = options.onExceeded || ((req, res) => res.sendStatus(429)); // default to 429 status
-        this.blockedIPs = new Set(); // To store blocked IP addresses
 
-        // Throttling settings (optional)
-        this.enableThrottling = options.enableThrottling || false;
-        this.throttleMax = options.throttleMax || 10; // default to 10 requests per short window
-        this.throttleWindowMs = options.throttleWindowMs || 1000; // default to 1 second
-        this.throttleStore = new Map(); // To store throttle counts
+        // Exponential Backoff settings (optional)
+        this.enableExponentialBackoff = options.enableExponentialBackoff || false;
+        this.baseDelayMs = options.baseDelayMs || 1000; // Default base delay is 1 second
+        this.maxDelayMs = options.maxDelayMs || 60000; // Default max delay is 60 seconds
+        this.delayMultiplier = options.delayMultiplier || 2; // Default multiplier is 2
     }
 
-    async delayedRateLimiting(req) {
+    async rateLimiting(req) {
         const identifier = this.getKey(req);
-
-        // Skip rate limiting if max is set to 0
-        if (this.max === 0) {
-            return false;
-        }
-
-        // Check if IP is blocked
-        if (this.blockedIPs.has(identifier)) {
-            return true;
-        }
 
         await this.store.increment(identifier);
         const currentCount = await this.store.get(identifier);
 
         if (currentCount > this.max) {
-            // Introduce a delay before proceeding if enabled
-            if (this.enableThrottling) {
-                await new Promise(resolve => setTimeout(resolve, 1000));
+            if (this.enableExponentialBackoff) {
+                //Calculate delay based on API calls greater than max
+                const multiplier = (currentCount-this.max)**(this.delayMultiplier-1);
+                const clientDelay = multiplier*this.baseDelayMs ;
+
+                // Introduce a delay based on the client's current delay
+                if (clientDelay > 0) {
+                    await new Promise(resolve => setTimeout(resolve, clientDelay));
+                    return false;
+                }
             }
             return true;
         }
@@ -59,27 +55,24 @@ class RateLimiter {
                 return this.onExceeded(req, res);
             }
 
+            // Skip rate limiting if max is set to 0
             if (this.max === 0) {
-                return next(); // Skip rate limiting if max is set to 0
+                return next(); 
             }
 
+            // Apply rate limiting instantly if windowMs is very small
             if (this.windowMs <= 50) {
-                return this.onExceeded(req, res); // Apply rate limiting instantly if windowMs is very small
-            }
-
-            // Throttle requests first (if enabled)
-            if (this.enableThrottling && await this.delayedRateLimiting(req)) {
                 return this.onExceeded(req, res);
             }
 
-            if (await this.delayedRateLimiting(req)) {
-                // Rate limit exceeded
-                this.setRateLimitHeaders(res, identifier);
-                return this.onExceeded(req, res);
-            }
-
-            // Request passed rate limiting, set headers
             this.setRateLimitHeaders(res, identifier);
+
+            if (await this.rateLimiting(req)) {
+                // Rate limit exceeded
+                return this.onExceeded(req, res);
+            }
+
+            // Request passed rate limiting
             next();
         };
     }

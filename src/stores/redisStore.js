@@ -40,8 +40,9 @@ class RedisStore {
      */
     async increment(key, value = 1) {
         const currentCount = await this.client.incrby(key, value);
-        // Set the expiration for the key
-        await this.client.pexpire(key, this.windowMs);
+        
+        // Set the expiration for the key (for other methods)
+        // await this.client.pexpire(key, this.windowMs);
 
         return {
             newCount: currentCount,

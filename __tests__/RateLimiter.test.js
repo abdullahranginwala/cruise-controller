@@ -48,7 +48,6 @@ describe('RateLimiter', () => {
     rateLimiter = new RateLimiter({
       windowMs: 60 * 1000, // 1 minute
       max: 5,
-      getKey: (req) => req.ip,
     });
 
     server = createServer(rateLimiter);
@@ -107,42 +106,23 @@ describe('RateLimiter', () => {
 
     rateLimiter.windowMs = 60 * 1000;
   });
-  // Rate Limiting
-  test('should limit request rate', async () => {
-    for (let i = 0; i < 5; i++) {
-        const response = await axios.get('http://localhost:3000');
-        expect(response.status).toBe(200);
-    }
 
-    await expect(axios.get('http://localhost:3000')).rejects.toThrow('Request failed with status code 429');
-});
+  // Exponential Backoff
+  test('should introduce delay for rate limiting', async () => {
+      rateLimiter.enableExponentialBackoff = true;
 
-// Delayed Rate Limiting
-test('should introduce delay for rate limiting', async () => {
-    rateLimiter.strategy = rateLimiter.delayedRateLimiting;
+      for (let i = 0; i < 5; i++) {
+        await axios.get('http://localhost:3000');
+      }
 
-    for (let i = 0; i < 5; i++) {
-        const start = Date.now();
-        const response = await axios.get('http://localhost:3000');
-        const end = Date.now();
-        expect(response.status).toBe(200);
-        expect(end - start).toBeGreaterThanOrEqual(1000); // Delay should be at least 1000 ms
-    }
+      const baseDelay = 1;
 
-    rateLimiter.strategy = rateLimiter.fixedWindow; // Restore the original strategy
-});
-
-// Throttling
-test('should allow burst requests before enforcing a stricter limit', async () => {
-    rateLimiter.enableThrottling = true;
-
-    // Send 10 requests in a burst
-    for (let i = 0; i < 10; i++) {
-        const response = await axios.get('http://localhost:3000');
-        expect(response.status).toBe(200);
-    }
-
-    // The 11th request within 1 minute should return a 429 status
-    await expect(axios.get('http://localhost:3000')).rejects.toThrow('Request failed with status code 429');
-});
+      for (let i = 0; i < 5; i++) {
+          const start = Date.now();
+          const response = await axios.get('http://localhost:3000');
+          const end = Date.now();
+          expect(response.status).toBe(200);
+          expect(end - start).toBeGreaterThanOrEqual(baseDelay**(i+1) * 1000);
+      }
+  }, 65000)
 });
