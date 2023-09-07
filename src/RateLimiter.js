@@ -2,19 +2,19 @@ const MemoryStore = require('./stores/memoryStore');
 
 class RateLimiter {
     constructor(options = {}) {
-        this.windowMs = options.windowMs || 60 * 1000; // default to 1 minute
-        this.max = options.max || 5; // default to 5 requests per windowMs
-        this.getKey = options.getKey || ((req) => req.ip); // default to IP if no getKey function provided
-        this.store = options.store || new MemoryStore({ windowMs: this.windowMs }); // using MemoryStore
+        this.windowMs = options.windowMs || 60 * 1000;
+        this.max = options.max || 5; 
+        this.getKey = options.getKey || ((req) => req.ip);
+        this.store = options.store || new MemoryStore({ windowMs: this.windowMs });
         this.whitelist = options.whitelist || [];
         this.blacklist = options.blacklist || [];
-        this.onExceeded = options.onExceeded || ((req, res) => res.sendStatus(429)); // default to 429 status
+        this.onExceeded = options.onExceeded || ((req, res) => res.sendStatus(429)); 
 
         // Exponential Backoff settings (optional)
         this.enableExponentialBackoff = options.enableExponentialBackoff || false;
-        this.baseDelayMs = options.baseDelayMs || 1000; // Default base delay is 1 second
-        this.maxDelayMs = options.maxDelayMs || 60000; // Default max delay is 60 seconds
-        this.delayMultiplier = options.delayMultiplier || 2; // Default multiplier is 2
+        this.baseDelayMs = options.baseDelayMs || 1000; 
+        this.maxDelayMs = options.maxDelayMs || 60000;
+        this.delayMultiplier = options.delayMultiplier || 2;
     }
 
     async rateLimiting(req) {

@@ -1,7 +1,7 @@
 # Cruise-Controller - An Express Middleware for Rate Limiting
 
 ## Introduction
-Cruise-controller is a flexible rate limiting middleware for Express. It allows you to limit requests based on custom identifiers such as IP addresses or authenticated users. It supports several rate limiting strategies and can use either in-memory or Redis storage. It also allows for whitelisting and blacklisting of identifiers, customizable error responses, and has features for robust handling of store failures.
+Cruise-controller is a flexible rate limiting middleware for Express. It allows you to limit requests based on custom identifiers such as IP addresses or authenticated users. It also supports throttling by performing exponential backoff and can use either in-memory or Redis storage. It also allows for whitelisting and blacklisting of identifiers, customizable error responses, and has features for robust handling of store failures.
 
 ## Installation
 First, install the package using npm:
@@ -25,7 +25,6 @@ const rateLimiter = new RateLimiter({
   whitelist: ['127.0.0.1'], // array of whitelisted identifiers
   blacklist: [], // array of blacklisted identifiers
   onExceeded: (req, res) => res.sendStatus(429), // function to execute when rate limit is exceeded
-  strategy: rateLimiter.fixedWindow // rate limiting strategy
 }); 
 ```
 
@@ -42,20 +41,20 @@ The rate limiter takes the following options:
 * `getKey`: A function that takes a request and returns an identifier. Defaults to the IP address from the request.
 * `store`: The store to use for storing rate limiting data. Defaults to an in-memory store. Can be a MemoryStore or RedisStore instance.
 * `whitelist`: An array of identifiers to always allow. Defaults to an empty array.
-blacklist: An array of identifiers to always block. Defaults to an empty array.
-onExceeded: A function that is called when the rate limit is exceeded. It receives the request and response objects and must send a response. Defaults to a function that sends a 429 status.
-* `strategy`: The rate limiting strategy to use. Defaults to fixed window. Can be any of the four provided strategies: fixedWindow, slidingWindowCounter, slidingWindowLog, tokenBucket.
+* `blacklist`: An array of identifiers to always block. Defaults to an empty array.
+* `onExceeded`: A function that is called when the rate limit is exceeded. It receives the request and response objects and must send a response. Defaults to a function that sends a 429 status.
 
-## Strategies
+## Exponential Backoff
+The rate limiting mechanism incorporates an `Exponential Backoff` feature, designed to gracefully handle rate-limit exceeded responses. When a client surpasses its allowed request limit, instead of receiving an immediate error response, this feature introduces a time delay for subsequent requests from that client. The delay duration starts conservatively and gradually increases with each exceeded request, allowing the client to recover and reduce the request rate. This ensures a smoother and more user-friendly experience, preventing rapid successive requests and minimizing service disruptions due to rate limiting.
 
-* `fixedWindow`: Allows a fixed number of requests in the specified window.
-* `slidingWindowCounter`: A variation of the fixed window strategy that starts a new window when the first request is received.
-* `slidingWindowLog`: Keeps a log of request timestamps and allows a maximum number of requests in the window.
-* `tokenBucket`: Allows a certain number of requests at any time but refills the "bucket" of allowed requests at a fixed rate.
+* `enableExponentialBackoff`: Option to enable the feature. Defaults to false.
+* `baseDelayMs`: The base delay time, in milliseconds. Defaults to 1 second.
+* `maxDelayMs`: The maximum limit to delay a request, in milliseconds. Defaults to 1 minute;
+* `delayMultiplier`: The multiplier to exponentially increase the current delay for each client. Defaults to 2.
 
 ## Custom Stores
 
-You can use a custom store by implementing a class with `increment` and `get` methods that both accept an identifier and return a Promise.
+You can implement your own custom store. Refer to `redisStore.js` and `memoryStore.js` for more info.
 
 ## Contributing
 
