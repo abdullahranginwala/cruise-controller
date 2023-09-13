@@ -1,7 +1,7 @@
 # Cruise-Controller - An Express Middleware for Rate Limiting
 
 ## Introduction
-Cruise-controller is a flexible rate limiting middleware for Express. It allows you to limit requests based on custom identifiers such as IP addresses or authenticated users. It also supports throttling by performing exponential backoff and can use either in-memory or Redis storage. It also allows for whitelisting and blacklisting of identifiers, customizable error responses, and has features for robust handling of store failures.
+Cruise-controller is a flexible rate limiting middleware for Express. It allows you to limit requests based on custom identifiers such as IP addresses or authenticated users. It also supports throttling by performing exponential backoff and can use either in-memory or Redis storage. It also allows for whitelisting and blacklisting of identifiers and several more configuration options.
 
 ## Installation
 First, install the package using npm:
