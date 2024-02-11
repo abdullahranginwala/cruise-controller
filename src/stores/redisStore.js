@@ -12,7 +12,7 @@ class RedisStore {
      */
     constructor(options) {
         // Initialize a Redis client
-        this.client = new Redis();
+        this.client = new Redis(options.redisOptions);
 
         /**
          * Window size after which all the hit counts are reset.
